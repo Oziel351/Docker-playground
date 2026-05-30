@@ -1,52 +1,78 @@
-A production-ready Docker Compose setup for a modern web application with React frontend, Node.js backend, PostgreSQL database, and Redis cache.
+# Docker Multi-Stage Full-Stack Stack
+
+Practice project focused on Docker skills: multi-stage builds, networking,
+health checks, named volumes, and secrets management using a React + Node.js
+
+- PostgreSQL + Redis stack.
+
+> **Purpose:** This is not a production application. The goal is to demonstrate
+> Docker best practices using a minimal but realistic multi-service setup.
+
+---
+
+## Stack
+
+| Service  | Image                                 | Role        |
+| -------- | ------------------------------------- | ----------- |
+| Frontend | Vite + React → served by Nginx alpine | Static SPA  |
+| Backend  | Node.js 20 alpine                     | REST API    |
+| Database | PostgreSQL 16 alpine                  | Persistence |
+| Cache    | Redis 7 alpine                        | Cache layer |
+
+---
 
 ## Architecture
 
-## Services
+You can find the architecture diagram in `/docs/architecture.png`. The key points are:
 
-### Frontend
+- The frontend and backend are on the `web` network, allowing them to communicate via service names (`backend`).
+- The backend, database, and cache are on the `internal` network, isolating them from the host and frontend. The backend can access `db` and `cache` via their service names, but the frontend cannot.
+- The database and cache use named volumes for data persistence, ensuring data survives container restarts and recreations.
 
-- **Image**: Built from `./frontend/Dockerfile`
-- **Port**: `8080:80`
-- **Network**: `web`
-- **Dependencies**: Waits for `backend` to be healthy
+---
 
-### Backend
+## Key Docker Concepts Practiced
 
-- **Image**: Built from `./backend/Dockerfile`
-- **Port**: `4000:4000`
-- **Networks**: `web` (public) + `internal` (to access db/cache)
-- **Dependencies**: Both `db` and `cache` must be healthy before starting
-- **Restart Policy**: On failure, max 3 retries
-- **Healthcheck**: GET `/api/health` every 15 seconds
-- **Environment**: Loads from `.env` file
+### Multi-stage Builds
 
-### PostgreSQL Database
+Both `frontend` and `backend` use two-stage Dockerfiles:
 
-- **Image**: `postgres:16-alpine`
-- **Port**: Not exposed (internal only)
-- **Network**: `internal`
-- **Database**: `tienda`
-- **Persistence**: Named volume `pg-data`
-- **Healthcheck**: `pg_isready` every 10 seconds
+- **Stage 1 (builder):** installs all dependencies and compiles
+- **Stage 2 (runner):** copies only the compiled output, leaving build tools behind
 
-### Redis Cache
+Result: significantly smaller and more secure final images.
 
-- **Image**: `redis:7.0-alpine`
-- **Port**: Not exposed (internal only)
-- **Network**: `internal`
-- **Persistence**: Named volume `redis-data`
-- **Healthcheck**: `redis-cli ping` every 10 seconds
+### Layer Caching
 
-## Networks
+Dependencies (`package.json`, `pnpm-lock.yaml`) are copied before source code in every Dockerfile, so `pnpm install` only re-runs when dependencies actually change, not on every code change.
 
-- **`web`** (bridge): Frontend and backend communicate here. Backend is publicly accessible on port 4000.
-- **`internal`** (bridge): Backend, database, and cache communicate here. Not accessible from the host.
+### Networks
 
-## Volumes
+Two isolated networks with a clear purpose:
 
-- **`pg-data`**: Persists PostgreSQL data
-- **`redis-data`**: Persists Redis snapshot
+- **`web`** (bridge): frontend ↔ backend communication
+- **`internal`** (bridge): backend ↔ db ↔ cache communication
+
+Database and cache are unreachable from the host — no `ports` exposed.
+
+### Health Checks
+
+Every service declares a `healthcheck`. The backend and frontend use `wget` (available in alpine without extra installs) to hit their respective endpoints. `depends_on` uses `condition: service_healthy` so services wait until dependencies are actually ready, not just started.
+
+### Named Volumes
+
+- `pg-data` → persists PostgreSQL data at `/var/lib/postgresql/data`
+- `redis-data` → persists Redis snapshots at `/data`
+
+Both volumes survive `docker compose down`. Data is only removed with `docker compose down -v`.
+
+### Secrets Management
+
+No passwords or keys are hardcoded in `docker-compose.yml` or any Dockerfile. All sensitive values are injected at runtime via `.env` (loaded by the backend service with `env_file`).
+
+### Non-root User
+
+The backend runs as the built-in `node` user from the official Node.js alpine image. Files are copied with `--chown=node:node` so the process can read them without needing root privileges.
 
 ## Quick Start
 
@@ -54,160 +80,84 @@ A production-ready Docker Compose setup for a modern web application with React 
 
 - Docker 20.10+
 - Docker Compose 2.0+
+- pnpm (only if running outside Docker)
 
-### Setup
-
-1. Clone the repository:
+### Run
 
 ```bash
-git clone <repo-url>
+# 1. Clone
+git clone https://github.com/tu-usuario/docker-fullstack.git
 cd docker-fullstack
-```
 
-2. Create `.env` from the example:
-
-```bash
+# 2. Set up environment
 cp .env.example .env
-```
 
-3. Build and start all services:
-
-```bash
+# 3. Build and start
 docker compose up --build
-```
 
-4. Verify services are healthy:
-
-```bash
+# 4. Verify all services are healthy
 docker compose ps
 ```
 
-Expected output:
-
-5. Access the application:
-
-- **Frontend**: http://localhost:8080
-- **Backend API**: http://localhost:4000
-- **API Health**: http://localhost:4000/api/health
-
-### Stop Services
+### Verify
 
 ```bash
-docker compose down
+# Backend health
+curl http://localhost:4000/api/health
+# Expected: {"status":"ok","timestamp":"..."}
+
+# Frontend
+open http://localhost:8080
+# Expected: Vite + React default page
 ```
 
-To also remove volumes and data:
+### Stop
 
 ```bash
-docker compose down -v
+docker compose down          # stop, keep volumes
+docker compose down -v       # stop and remove volumes
 ```
 
-## Environment Variables
+---
 
-See `.env.example` for all available configuration options. Copy and customize for your environment.
-
-Critical variables:
-
-- `DB_HOST`: Should be `db` (service name in Docker network)
-- `REDIS_HOST`: Should be `cache` (service name)
-- `NODE_ENV`: Should be `production` for backend
-
-## Troubleshooting
-
-### Services keep restarting
-
-Check backend logs:
+## Useful Commands
 
 ```bash
+# Real-time logs for all services
+docker compose logs -f
+
+# Logs for a specific service
 docker compose logs -f backend
-```
 
-### Can't connect to database from backend
+# Real-time resource usage
+docker stats
 
-Ensure `.env` has `DB_HOST=db` (not `localhost`). Localhost inside a container refers to that container itself, not the `db` service.
+# Inspect a container (ports, health, env, mounts)
+docker inspect backend_prueba
 
-### Port already in use
-
-Change the port mapping in `docker-compose.yml`:
-
-```yaml
-ports:
-  - "8081:80" # Changed from 8080 to 8081
-```
-
-### Check service health details
-
-```bash
-docker compose ps
-docker inspect <service_name>
-docker logs <service_name>
-```
-
-## Development
-
-### Rebuild after code changes
-
-```bash
-docker compose up --build
-```
-
-### Access container shell (if running)
-
-```bash
+# Enter a running container
 docker compose exec backend sh
 docker compose exec frontend sh
-```
 
-### View real-time logs
+# Rebuild only one service
+docker compose up --build backend
 
-```bash
-docker compose logs -f  # All services
-docker compose logs -f backend  # Specific service
-```
+## Problems I Hit and How I Fixed Them
 
-### Monitor resource usage
+#1 Getting role "root" does not exist when backend tries to connect to PostgreSQL
+**Symptom:** Backend logs show `psql: error: FATAL:  role "root" does not exist`.
+**Root cause:** The backend was trying to connect to PostgreSQL using the default `root` user, which doesn't exist in the PostgreSQL image.
+**Fix:** Set the correct environment variables in the `.env` file and ensure they are passed to the backend service via `env_file` in `docker-compose.yml`. The backend should use `POSTGRES_USER` and `POSTGRES_PASSWORD` to connect.
 
-```bash
-docker stats
-```
+#Screenshot: /docs/screenshots/postgres-root-error.png
 
-## Production Considerations
 
-- [ ] Move all secrets to a secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.)
-- [ ] Use `docker compose.prod.yml` with resource limits
-- [ ] Enable PostgreSQL backups and replication
-- [ ] Use Alpine-based images for smaller attack surface
-- [ ] Run containers as non-root users (already done)
 
-## Key Learnings
+Each issue above was discovered by running `docker compose logs -f` and `docker inspect` to read exit codes, error messages, and container state. Screenshots are included in `/docs/screenshots/` for reference.
 
-### Multi-network Architecture
-
-- `web` network allows frontend-to-backend communication
-- `internal` network isolates database and cache from the host
-- Backend bridges both networks
-
-### Health Checks
-
-All services include healthchecks to ensure:
-
-- Service is actually ready (not just running)
-- Orchestrators can restart failed services
-- `depends_on: condition: service_healthy` works correctly
-
-### Layer Caching
-
-- Dependencies (`package*.json`) copied before source code
-- Rebuilds only recompile changed layers
-- Reduces build time and image size
-
-### Security
-
-- No hardcoded secrets in Dockerfile or compose
-- Secrets passed via `.env` file (not committed to git)
-- Database not exposed to host
-- Non-root user for backend (if configured in Dockerfile)
+---
 
 ## License
 
 MIT
+```
