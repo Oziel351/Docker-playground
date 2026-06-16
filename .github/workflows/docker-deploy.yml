@@ -11,8 +11,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_OWNER: ${{ github.repository_owner }}
-  FRONTEND_IMAGE: docker-playground-frontend
-  BACKEND_IMAGE: docker-playground-backend
+  FRONTEND_IMAGE: docker-app-frontend
+  BACKEND_IMAGE: docker-ap-backend
 
 jobs:
   build-and-push:
@@ -40,14 +40,12 @@ jobs:
       - name: Build frontend image
         run: |
           docker build \
-            -t $REGISTRY/$IMAGE_OWNER_LC/$FRONTEND_IMAGE:latest \
             -t $REGISTRY/$IMAGE_OWNER_LC/$FRONTEND_IMAGE:${{ github.sha }} \
             ./frontend
 
       - name: Build backend image
         run: |
           docker build \
-            -t $REGISTRY/$IMAGE_OWNER_LC/$BACKEND_IMAGE:latest \
             -t $REGISTRY/$IMAGE_OWNER_LC/$BACKEND_IMAGE:${{ github.sha }} \
             ./backend
 
@@ -57,11 +55,9 @@ jobs:
       - name: Push frontend image
         if: github.event_name == 'push'
         run: |
-          docker push $REGISTRY/$IMAGE_OWNER_LC/$FRONTEND_IMAGE:latest
           docker push $REGISTRY/$IMAGE_OWNER_LC/$FRONTEND_IMAGE:${{ github.sha }}
 
       - name: Push backend image
         if: github.event_name == 'push'
         run: |
-          docker push $REGISTRY/$IMAGE_OWNER_LC/$BACKEND_IMAGE:latest
           docker push $REGISTRY/$IMAGE_OWNER_LC/$BACKEND_IMAGE:${{ github.sha }}
