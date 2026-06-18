@@ -1,6 +1,7 @@
 services:
   frontend:
     container_name: frontend_prueba
+    image: ghcr.io/${IMAGE_OWNER_LC}/docker-app-frontend:${IMAGE_TAG:-latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -13,6 +14,7 @@ services:
       - web
   backend:
     container_name: backend_prueba
+    image: ghcr.io/${IMAGE_OWNER_LC}/docker-app-backend:${IMAGE_TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
