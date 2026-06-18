@@ -1,5 +1,7 @@
 # Docker Multi-Stage Full-Stack Stack
 
+[![Build and Push Docker Images](https://github.com/Oziel351/Docker-playground/actions/workflows/docker-deploy.yml/badge.svg)](https://github.com/Oziel351/Docker-playground/actions/workflows/docker-deploy.yml)
+
 Practice project focused on Docker skills: multi-stage builds, networking,
 health checks, named volumes, and secrets management using a React + Node.js
 
