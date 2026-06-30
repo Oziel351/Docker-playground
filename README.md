@@ -3,9 +3,8 @@
 [![Build and Push Docker Images](https://github.com/Oziel351/Docker-playground/actions/workflows/docker-deploy.yml/badge.svg)](https://github.com/Oziel351/Docker-playground/actions/workflows/docker-deploy.yml)
 
 Practice project focused on Docker skills: multi-stage builds, networking,
-health checks, named volumes, and secrets management using a React + Node.js
-
-- PostgreSQL + Redis stack.
+health checks, named volumes, and secrets management using a React + Node.js +
+PostgreSQL + Redis stack.
 
 > **Purpose:** This is not a production application. The goal is to demonstrate
 > Docker best practices using a minimal but realistic multi-service setup.
@@ -25,7 +24,7 @@ health checks, named volumes, and secrets management using a React + Node.js
 
 ## Architecture
 
-You can find the architecture diagram in `/docs/architecture.png`. The key points are:
+You can find the architecture diagram in `/docs/screenshots/architecture.png`. The key points are:
 
 - The frontend and backend are on the `web` network, allowing them to communicate via service names (`backend`).
 - The backend, database, and cache are on the `internal` network, isolating them from the host and frontend. The backend can access `db` and `cache` via their service names, but the frontend cannot.
@@ -88,8 +87,8 @@ The backend runs as the built-in `node` user from the official Node.js alpine im
 
 ```bash
 # 1. Clone
-git clone https://github.com/tu-usuario/docker-fullstack.git
-cd docker-fullstack
+git clone https://github.com/Oziel351/Docker-playground.git
+cd Docker-playground
 
 # 2. Set up environment
 cp .env.example .env
@@ -106,7 +105,7 @@ docker compose ps
 ```bash
 # Backend health
 curl http://localhost:4000/api/health
-# Expected: {"status":"ok","timestamp":"..."}
+# Expected: {"status":"ok"}
 
 # Frontend
 open http://localhost:8080
@@ -143,17 +142,18 @@ docker compose exec frontend sh
 
 # Rebuild only one service
 docker compose up --build backend
+```
+
+---
 
 ## Problems I Hit and How I Fixed Them
 
-#1 Getting role "root" does not exist when backend tries to connect to PostgreSQL
-**Symptom:** Backend logs show `psql: error: FATAL:  role "root" does not exist`.
-**Root cause:** The backend was trying to connect to PostgreSQL using the default `root` user, which doesn't exist in the PostgreSQL image.
-**Fix:** Set the correct environment variables in the `.env` file and ensure they are passed to the backend service via `env_file` in `docker-compose.yml`. The backend should use `POSTGRES_USER` and `POSTGRES_PASSWORD` to connect.
+**1. `role "root" does not exist` when backend tries to connect to PostgreSQL**
 
-#Screenshot: /docs/screenshots/postgres-root-error.png
-
-
+- **Symptom:** Backend logs show `psql: error: FATAL:  role "root" does not exist`.
+- **Root cause:** The backend was trying to connect to PostgreSQL using the default `root` user, which doesn't exist in the PostgreSQL image.
+- **Fix:** Set the correct environment variables in the `.env` file and ensure they are passed to the backend service via `env_file` in `compose.yaml`. The backend should use `POSTGRES_USER` and `POSTGRES_PASSWORD` to connect.
+- Screenshot: `/docs/screenshots/postgress-user-error.png`
 
 Each issue above was discovered by running `docker compose logs -f` and `docker inspect` to read exit codes, error messages, and container state. Screenshots are included in `/docs/screenshots/` for reference.
 
@@ -162,4 +162,3 @@ Each issue above was discovered by running `docker compose logs -f` and `docker 
 ## License
 
 MIT
-```
